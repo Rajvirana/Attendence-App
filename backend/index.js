@@ -4,7 +4,6 @@ import { Server } from "socket.io";
 import mongoose from "mongoose";
 import app from "./app.js";
 import { initSocket } from "./socket/socketHandler.js";
-import { resolveAllowedOrigins } from "./utils/corsOrigins.js";
 
 if (!process.env.JWT_SECRET) {
   console.error("[startup] Missing JWT_SECRET — add it in Render → Environment.");
@@ -17,18 +16,11 @@ if (!process.env.MONGODB_URI) {
 
 const port = Number(process.env.PORT) || 5000;
 
-function socketCors() {
-  const list = resolveAllowedOrigins(process.env.CLIENT_URL);
-  if (list == null) {
-    return { origin: true, credentials: true };
-  }
-  return { origin: list, credentials: true };
-}
-
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    ...socketCors(),
+    origin: true,
+    credentials: true,
     methods: ["GET", "POST"],
   },
 });

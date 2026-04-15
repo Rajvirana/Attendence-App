@@ -3,29 +3,25 @@ import { fileURLToPath } from "url";
 import express from "express";
 import cors from "cors";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const uploadsDir = path.join(__dirname, "uploads");
-
 import authRoutes from "./routes/authRoutes.js";
 import classRoutes from "./routes/classRoutes.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
 import materialRoutes from "./routes/materialRoutes.js";
-import { resolveAllowedOrigins } from "./utils/corsOrigins.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const uploadsDir = path.join(__dirname, "uploads");
 
 const app = express();
 
-function corsOriginOption() {
-  const list = resolveAllowedOrigins(process.env.CLIENT_URL);
-  if (list == null) {
-    return true;
-  }
-  return list;
-}
-
+// Reflect request Origin (works for Vercel previews, custom domains, localhost).
+// JWT is sent in Authorization header — not cookies — so this is standard for SPA + API.
 app.use(
   cors({
-    origin: corsOriginOption(),
+    origin: true,
     credentials: true,
+    methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    optionsSuccessStatus: 204,
   })
 );
 app.use(express.json({ limit: "2mb" }));
