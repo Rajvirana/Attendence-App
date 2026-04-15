@@ -28,17 +28,28 @@ const io = new Server(server, {
 app.set("io", io);
 initSocket(io);
 
+mongoose.connection.on("connected", () => console.log("[mongo] Connected"));
+mongoose.connection.on("disconnected", () => console.log("[mongo] Disconnected — will auto-reconnect"));
+mongoose.connection.on("error", (err) => console.error("[mongo] Error:", err.message));
+
 mongoose
-  .connect(process.env.MONGODB_URI)
+  .connect(process.env.MONGODB_URI, {
+    serverSelectionTimeoutMS: 15000,
+    socketTimeoutMS: 45000,
+    maxPoolSize: 10,
+    minPoolSize: 2,
+    retryWrites: true,
+    retryReads: true,
+  })
   .then(() => {
     server.listen(port, () => {
-      console.log(`Server listening on port ${port}`);
+      console.log(`[startup] Server listening on port ${port}`);
     });
   })
   .catch((err) => {
-    console.error("MongoDB connection failed:", err.message);
+    console.error("[startup] MongoDB connection failed:", err.message);
     console.error(
-      "[startup] Fix: Atlas → Network Access allow 0.0.0.0/0 (or Render egress), correct user/password, URL-encode special chars in password."
+      "Fix: Atlas → Network Access allow 0.0.0.0/0 (or Render IPs), correct user/password, URL-encode special chars."
     );
     process.exit(1);
   });

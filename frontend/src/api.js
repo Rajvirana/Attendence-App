@@ -5,30 +5,91 @@ export function apiUrl(path) {
   return `${API_BASE}${p}`;
 }
 
+const RETRYABLE = new Set([502, 503, 504]);
+const MAX_RETRIES = 4;
+
+async function rawFetch(url, options) {
+  const res = await fetch(url, options);
+  const text = await res.text();
+  return { res, text };
+}
+
+async function fetchWithRetry(url, options) {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const { res, text } = await rawFetch(url, options);
+      if (RETRYABLE.has(res.status) && attempt < MAX_RETRIES) {
+        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+        continue;
+      }
+      return { res, text };
+    } catch (e) {
+      if (attempt < MAX_RETRIES) {
+        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+        continue;
+      }
+      throw e;
+    }
+  }
+  return rawFetch(url, options);
+}
+
+export async function wakeUpApi() {
+  try {
+    await fetchWithRetry(apiUrl('/api/health'), { method: 'GET' });
+  } catch {
+    // swallow — the real call will surface the error
+  }
+}
+
 export async function apiFetch(path, options = {}) {
+  if (import.meta.env.PROD && !API_BASE && String(path).startsWith('/api')) {
+    throw new Error(
+      'VITE_API_BASE_URL is not set. Add it in Vercel → Settings → Environment Variables → VITE_API_BASE_URL = https://attendence-app-jlgs.onrender.com then Redeploy.'
+    );
+  }
+
   const headers = new Headers(options.headers);
   const token = localStorage.getItem('token');
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
-  if (options.body !== undefined && options.body !== null && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
+  if (
+    options.body !== undefined &&
+    options.body !== null &&
+    !(options.body instanceof FormData) &&
+    !headers.has('Content-Type')
+  ) {
     headers.set('Content-Type', 'application/json');
   }
-  const res = await fetch(apiUrl(path), { ...options, headers });
-  const text = await res.text();
+
+  let res;
+  let text;
+  try {
+    ({ res, text } = await fetchWithRetry(apiUrl(path), { ...options, headers }));
+  } catch (e) {
+    const isCors = e?.name === 'TypeError';
+    throw new Error(
+      isCors
+        ? 'Network / CORS error — the API may be waking up (Render free tier). Wait ~30s and refresh.'
+        : e?.message || 'Request failed'
+    );
+  }
+
   let data = null;
   try {
     data = text ? JSON.parse(text) : null;
   } catch {
-    data = { message: text || 'Invalid response' };
+    const looksLikeHtml = text && /^\s*</.test(text);
+    data = {
+      message: looksLikeHtml
+        ? 'API returned HTML — VITE_API_BASE_URL may be wrong or the API is down.'
+        : text || 'Invalid response',
+    };
   }
+
   if (!res.ok) {
-    let msg = data?.message || res.statusText;
-    if (res.status === 403 && !data?.message) {
-      msg =
-        'Request blocked (403). If the API uses CLIENT_URL, add your exact app URL (try http://localhost:5173 and http://127.0.0.1:5173), or leave CLIENT_URL empty for local dev.';
-    }
-    const err = new Error(msg);
+    const err = new Error(data?.message || res.statusText);
     err.status = res.status;
     err.data = data;
     throw err;

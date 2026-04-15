@@ -2,6 +2,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import express from "express";
 import cors from "cors";
+import mongoose from "mongoose";
 
 import authRoutes from "./routes/authRoutes.js";
 import classRoutes from "./routes/classRoutes.js";
@@ -13,8 +14,6 @@ const uploadsDir = path.join(__dirname, "uploads");
 
 const app = express();
 
-// Reflect request Origin (works for Vercel previews, custom domains, localhost).
-// JWT is sent in Authorization header — not cookies — so this is standard for SPA + API.
 app.use(
   cors({
     origin: true,
@@ -27,8 +26,22 @@ app.use(
 app.use(express.json({ limit: "2mb" }));
 app.use("/uploads", express.static(uploadsDir));
 
+// Reject early if MongoDB is disconnected — gives a clear 503 instead of hanging
+app.use("/api", (req, res, next) => {
+  if (req.path === "/health") return next();
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ message: "Database not ready — server is starting up, try again in a few seconds" });
+  }
+  next();
+});
+
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, service: "attendance-api" });
+  const dbReady = mongoose.connection.readyState === 1;
+  res.status(dbReady ? 200 : 503).json({
+    ok: dbReady,
+    service: "attendance-api",
+    db: dbReady ? "connected" : "connecting",
+  });
 });
 
 app.use("/api/auth", authRoutes);

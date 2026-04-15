@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { apiFetch } from './api';
+import { apiFetch, wakeUpApi } from './api';
 
 const AuthContext = createContext(null);
 
@@ -29,7 +29,8 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    loadMe();
+    // Wake the Render API (free tier sleeps after 15 min) then load profile
+    wakeUpApi().then(loadMe);
   }, [loadMe]);
 
   const login = useCallback(async (email, password) => {
@@ -44,14 +45,29 @@ export function AuthProvider({ children }) {
   }, []);
 
   const register = useCallback(async (body) => {
-    const data = await apiFetch('/api/auth/register', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    });
-    localStorage.setItem('token', data.token);
-    setToken(data.token);
-    setUser(data.user);
-    return data.user;
+    try {
+      const data = await apiFetch('/api/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      localStorage.setItem('token', data.token);
+      setToken(data.token);
+      setUser(data.user);
+      return data.user;
+    } catch (err) {
+      // If a retry caused a duplicate, the account exists — just log in
+      if (err.status === 409) {
+        const data = await apiFetch('/api/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ email: body.email, password: body.password }),
+        });
+        localStorage.setItem('token', data.token);
+        setToken(data.token);
+        setUser(data.user);
+        return data.user;
+      }
+      throw err;
+    }
   }, []);
 
   const logout = useCallback(() => {
