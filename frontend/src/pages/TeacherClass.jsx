@@ -24,6 +24,7 @@ export default function TeacherClass() {
   const loadClass = useCallback(async () => {
     const { class: c } = await apiFetch(`/api/classes/${id}`);
     setCls(c);
+    return c;
   }, [id]);
 
   const loadSession = useCallback(async () => {
@@ -35,10 +36,15 @@ export default function TeacherClass() {
         markedCount: s.markedCount,
         totalStudents: s.totalStudents,
       });
-      const rec = await apiFetch(`/api/sessions/${s.id}/records`);
-      setRecords(rec.records);
+      try {
+        const rec = await apiFetch(`/api/sessions/${s.id}/records`);
+        setRecords(rec.records);
+      } catch {
+        setRecords([]);
+      }
     } else {
       setRecords([]);
+      setLive(null);
     }
   }, [id]);
 
@@ -53,6 +59,7 @@ export default function TeacherClass() {
     setLogs(data.records);
   }, [id, logDate]);
 
+  // Initial load
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -71,6 +78,15 @@ export default function TeacherClass() {
       cancelled = true;
     };
   }, [loadClass, loadSession, loadMaterials]);
+
+  // Refresh class + session every 10s so new students appear
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadClass().catch(() => {});
+      loadSession().catch(() => {});
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [loadClass, loadSession]);
 
   useEffect(() => {
     if (tab !== 'logs') return undefined;
@@ -102,29 +118,27 @@ export default function TeacherClass() {
     });
     socket.on('session:started', (payload) => {
       if (payload.classId === id) {
-        loadSession();
+        loadClass().catch(() => {});
+        loadSession().catch(() => {});
       }
     });
     socket.on('session:ended', (payload) => {
       if (payload.classId === id) {
-        loadSession();
+        loadSession().catch(() => {});
       }
     });
-    const interval = setInterval(() => {
-      loadSession();
-    }, 12000);
     return () => {
-      clearInterval(interval);
       socket.emit('leave:class', { classId: id });
       socket.disconnect();
     };
-  }, [token, id, loadSession]);
+  }, [token, id, loadClass, loadSession]);
 
   async function startAttendance() {
     setActionLoading(true);
     setError('');
     try {
       await apiFetch(`/api/classes/${id}/sessions/start`, { method: 'POST' });
+      await loadClass();
       await loadSession();
     } catch (e) {
       setError(e.message);
@@ -193,8 +207,8 @@ export default function TeacherClass() {
   const recordByStudent = useMemo(() => {
     const m = new Map();
     records.forEach((r) => {
-      const sid = r.student?.id || r.student?._id;
-      if (sid) m.set(String(sid), r);
+      const sid = String(r.student?._id || r.student?.id || '');
+      if (sid) m.set(sid, r);
     });
     return m;
   }, [records]);
@@ -222,6 +236,7 @@ export default function TeacherClass() {
           </Link>
           <h1 className="mt-2 text-2xl font-semibold text-white">{cls?.name}</h1>
           <p className="font-mono text-sm text-cyan-400">Code: {cls?.code}</p>
+          <p className="mt-1 text-xs text-slate-500">{students.length} student{students.length !== 1 ? 's' : ''} enrolled</p>
         </div>
       </div>
 
@@ -279,11 +294,6 @@ export default function TeacherClass() {
                 <div className="mt-1 text-3xl font-semibold text-white">{live?.totalStudents ?? session?.totalStudents ?? students.length}</div>
               </div>
             </div>
-            {session?.active && session?.id && (
-              <p className="mt-4 text-xs text-slate-500">
-                Session ID: <span className="font-mono text-slate-400">{session.id}</span>
-              </p>
-            )}
           </section>
 
           <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6">
@@ -291,6 +301,13 @@ export default function TeacherClass() {
             <p className="mt-1 text-sm text-slate-400">Override or set attendance for each student.</p>
             {!session?.active ? (
               <p className="mt-4 text-sm text-slate-500">Start a session to enable manual marking.</p>
+            ) : students.length === 0 ? (
+              <div className="mt-4 rounded-lg border border-dashed border-slate-700 p-4 text-center">
+                <p className="text-sm text-slate-400">No students enrolled yet.</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Share class code <span className="font-mono text-cyan-400">{cls?.code}</span> with your students so they can join.
+                </p>
+              </div>
             ) : (
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full text-left text-sm">
@@ -303,7 +320,7 @@ export default function TeacherClass() {
                   </thead>
                   <tbody>
                     {students.map((s) => {
-                      const sid = s.id || s._id;
+                      const sid = String(s._id || s.id);
                       const r = recordByStudent.get(sid);
                       return (
                         <tr key={sid} className="border-b border-slate-800/80">
@@ -317,7 +334,7 @@ export default function TeacherClass() {
                                 {r.present ? 'Present' : 'Absent'} ({r.source})
                               </span>
                             ) : (
-                              <span className="text-slate-500">—</span>
+                              <span className="text-slate-500">Not marked</span>
                             )}
                           </td>
                           <td className="py-2">
