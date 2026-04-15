@@ -7,11 +7,11 @@ import { initSocket } from "./socket/socketHandler.js";
 import { resolveAllowedOrigins } from "./utils/corsOrigins.js";
 
 if (!process.env.JWT_SECRET) {
-  console.error("Missing JWT_SECRET");
+  console.error("[startup] Missing JWT_SECRET — add it in Render → Environment.");
   process.exit(1);
 }
 if (!process.env.MONGODB_URI) {
-  console.error("Missing MONGODB_URI");
+  console.error("[startup] Missing MONGODB_URI — add your MongoDB Atlas URI in Render → Environment.");
   process.exit(1);
 }
 
@@ -45,5 +45,8 @@ mongoose
   })
   .catch((err) => {
     console.error("MongoDB connection failed:", err.message);
+    console.error(
+      "[startup] Fix: Atlas → Network Access allow 0.0.0.0/0 (or Render egress), correct user/password, URL-encode special chars in password."
+    );
     process.exit(1);
   });

@@ -17,11 +17,36 @@ If Cloudinary is not configured, the API stores files under `/uploads` on the se
 
 ## 3. Render (backend)
 
+Use **one** of these setups (they are equivalent).
+
+### A. Monorepo root (repo root = Render root) — most common mistake
+
+If Render’s **Root Directory** is empty (whole repo), the build **must** install the API’s dependencies:
+
+| Field | Value |
+|-------|--------|
+| **Build Command** | `npm install` *(root `postinstall` also runs `npm install --prefix backend`)* |
+| **Start Command** | `node server.js` *(see [`server.js`](./server.js) at repo root)* or `npm start` |
+
+If **`postinstall`** is disabled or fails, you only get ~**26** root packages and the API will crash — run `npm run render-build` manually or set **Build** to `npm install && npm run render-build`.
+
+Older templates use `node src/server.js` — this repo also includes [`src/server.js`](./src/server.js) for that path.
+
+### B. API only (recommended)
+
+| Field | Value |
+|-------|--------|
+| **Root Directory** | `backend` |
+| **Build Command** | `npm install` |
+| **Start Command** | `npm start` |
+
+Or use the included [`render.yaml`](./render.yaml) Blueprint so `rootDir: backend` is applied automatically.
+
+---
+
 1. New **Web Service** → connect this repo (or deploy from Git).
-2. **Root directory:** `backend`
-3. **Build command:** `npm install`
-4. **Start command:** `npm start`
-5. **Environment variables:**
+2. Configure **Root directory** and **Build / Start** as in **A** or **B** above.
+3. **Environment variables:**
 
 | Variable | Example |
 |----------|---------|
@@ -34,7 +59,7 @@ If Cloudinary is not configured, the API stores files under `/uploads` on the se
 | `CLOUDINARY_API_KEY` | from Cloudinary |
 | `CLOUDINARY_API_SECRET` | from Cloudinary |
 
-6. After deploy, note the public URL, e.g. `https://attendance-api-xxxx.onrender.com`.
+4. After deploy, note the public URL, e.g. `https://attendance-api-xxxx.onrender.com`.
 
 **Socket.IO:** The same Render service hosts HTTP + WebSocket. No separate port.
 
@@ -73,3 +98,24 @@ If the API exits with “Missing JWT_SECRET” or “Missing MONGODB_URI”, the
 ## 7. Health check
 
 `GET https://your-api.onrender.com/api/health` should return `{ "ok": true, ... }`.
+
+---
+
+## 8. Render deploy failed (exit code 1)
+
+The API **exits with status 1** only in a few cases. Check **Logs** on the Render service.
+
+| Symptom in logs | What to do |
+|-----------------|------------|
+| `Missing JWT_SECRET` | Add `JWT_SECRET` in **Environment** (any long random string). |
+| `Missing MONGODB_URI` | Add `MONGODB_URI` (Atlas connection string). |
+| `MongoDB connection failed` | **Atlas → Network Access:** allow **`0.0.0.0/0`** (or troubleshoot IP rules). Confirm database user/password; **URL-encode** special characters in the password inside the URI. |
+| `Cannot find module` / `MODULE_NOT_FOUND` | **Root Directory** must be **`backend`**, or build must run `npm install` inside `backend`. Using repo root without installing `backend` deps will fail. |
+
+**Recommended:** use the included [`render.yaml`](./render.yaml) (Blueprint) or set manually:
+
+- **Root Directory:** `backend`
+- **Build Command:** `npm install`
+- **Start Command:** `npm start`
+
+**Required environment variables on Render:** `JWT_SECRET`, `MONGODB_URI`, `CLIENT_URL` (your Vercel URL), `PUBLIC_API_URL` (this Render service URL, no trailing slash). Optional: Cloudinary vars for uploads.
