@@ -53,8 +53,8 @@ Or use the included [`render.yaml`](./render.yaml) Blueprint so `rootDir: backen
 | `PORT` | (set automatically by Render) |
 | `MONGODB_URI` | `mongodb+srv://...` |
 | `JWT_SECRET` | long random string |
-| `CLIENT_URL` | `https://your-app.vercel.app` (comma-separate multiple origins if needed) |
-| `PUBLIC_API_URL` | `https://your-service.onrender.com` |
+| `CLIENT_URL` | `https://attendenceapp-git-main-rajvi-ranas-projects.vercel.app` (comma-separate if you add a production domain like `https://attendenceapp.vercel.app`) |
+| `PUBLIC_API_URL` | `https://attendence-app-jlgs.onrender.com` (your Render URL; no trailing slash) |
 | `CLOUDINARY_CLOUD_NAME` | from Cloudinary |
 | `CLOUDINARY_API_KEY` | from Cloudinary |
 | `CLOUDINARY_API_SECRET` | from Cloudinary |
@@ -73,7 +73,7 @@ Or use the included [`render.yaml`](./render.yaml) Blueprint so `rootDir: backen
 
 | Variable | Value |
 |----------|--------|
-| `VITE_API_BASE_URL` | `https://your-service.onrender.com` (no trailing slash) |
+| `VITE_API_BASE_URL` | `https://attendence-app-jlgs.onrender.com` (no trailing slash; use your own Render URL if different) |
 
 6. Redeploy after changing env vars.
 
@@ -81,9 +81,12 @@ The client uses `VITE_API_BASE_URL` for REST calls and Socket.IO.
 
 ## 5. CORS
 
-`CLIENT_URL` on Render must include your Vercel production URL (and preview URLs if you use them), comma-separated:
+`CLIENT_URL` on Render must include the **exact** origin your browser uses (no trailing slash), comma-separated if you have several (e.g. main + preview):
 
-`https://app.vercel.app,https://app-git-branch-user.vercel.app`
+`https://attendenceapp-git-main-rajvi-ranas-projects.vercel.app`
+
+If Vercel also assigns a shorter production URL, add it too, e.g.  
+`https://attendenceapp-git-main-rajvi-ranas-projects.vercel.app,https://attendenceapp.vercel.app`
 
 ## 6. Local development
 
@@ -97,7 +100,7 @@ If the API exits with “Missing JWT_SECRET” or “Missing MONGODB_URI”, the
 
 ## 7. Health check
 
-`GET https://your-api.onrender.com/api/health` should return `{ "ok": true, ... }`.
+`GET https://attendence-app-jlgs.onrender.com/api/health` should return `{ "ok": true, ... }`.
 
 ---
 
