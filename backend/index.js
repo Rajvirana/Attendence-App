@@ -4,6 +4,7 @@ import { Server } from "socket.io";
 import mongoose from "mongoose";
 import app from "./app.js";
 import { initSocket } from "./socket/socketHandler.js";
+import { resolveAllowedOrigins } from "./utils/corsOrigins.js";
 
 if (!process.env.JWT_SECRET) {
   console.error("Missing JWT_SECRET");
@@ -17,17 +18,11 @@ if (!process.env.MONGODB_URI) {
 const port = Number(process.env.PORT) || 5000;
 
 function socketCors() {
-  const raw = process.env.CLIENT_URL || "";
-  if (!raw.trim()) {
+  const list = resolveAllowedOrigins(process.env.CLIENT_URL);
+  if (list == null) {
     return { origin: true, credentials: true };
   }
-  return {
-    origin: raw
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean),
-    credentials: true,
-  };
+  return { origin: list, credentials: true };
 }
 
 const server = http.createServer(app);

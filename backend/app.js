@@ -10,23 +10,21 @@ import authRoutes from "./routes/authRoutes.js";
 import classRoutes from "./routes/classRoutes.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
 import materialRoutes from "./routes/materialRoutes.js";
+import { resolveAllowedOrigins } from "./utils/corsOrigins.js";
 
 const app = express();
 
-function parseOrigins() {
-  const raw = process.env.CLIENT_URL || "";
-  if (!raw.trim()) {
+function corsOriginOption() {
+  const list = resolveAllowedOrigins(process.env.CLIENT_URL);
+  if (list == null) {
     return true;
   }
-  return raw
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  return list;
 }
 
 app.use(
   cors({
-    origin: parseOrigins(),
+    origin: corsOriginOption(),
     credentials: true,
   })
 );

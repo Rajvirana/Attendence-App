@@ -23,7 +23,12 @@ export async function apiFetch(path, options = {}) {
     data = { message: text || 'Invalid response' };
   }
   if (!res.ok) {
-    const err = new Error(data?.message || res.statusText);
+    let msg = data?.message || res.statusText;
+    if (res.status === 403 && !data?.message) {
+      msg =
+        'Request blocked (403). If the API uses CLIENT_URL, add your exact app URL (try http://localhost:5173 and http://127.0.0.1:5173), or leave CLIENT_URL empty for local dev.';
+    }
+    const err = new Error(msg);
     err.status = res.status;
     err.data = data;
     throw err;
